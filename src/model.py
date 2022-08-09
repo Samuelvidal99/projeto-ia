@@ -3,13 +3,16 @@ from __future__ import annotations
 import pandas as pd
 import random
 import numpy as np
+import spacy
 import torch
 import torch.nn as nn
-from sklearn.metrics import accuracy_score
+from tqdm import tqdm
+from spacy.lang.pt import Portuguese
+from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
 
 
-def run_model(params: dict, threshold: int, data: tuple[str, str], random: int) -> float:
+def run_model(nlp: Portuguese, params: dict, threshold: int, data: tuple[str, str], random: int) -> float:
     # Configurar seeds
     np.random.seed(random)
     torch.manual_seed(random)
@@ -17,14 +20,23 @@ def run_model(params: dict, threshold: int, data: tuple[str, str], random: int) 
     # Configurar hiperparâmetros estáticos
     lr = 0.001
     weight_decay = 0.0001
-    criterion = nn.BCELoss()
+    criterion = nn.MSELoss()
     test_size = 0.25
 
     # Carregar dados
     features = pd.read_csv(data[0])
     labels = pd.read_csv(data[1])
 
-    features = np.array(features, dtype='float32')
+    # Coletar vetores das sentenças e configurar o tamanho máximo de entrada
+    features_ = []
+    for _, row in tqdm(features.iterrows()):
+        text = row['essay']
+        features_.append(nlp(text).vector)
+
+    input_length = len(features_[0])
+    
+    # Converter objetos para arrays
+    features = np.array(features_, dtype='float32')
     labels = np.array(labels, dtype='float32')
 
     # Separar os dados em conjunto de treino e teste
@@ -60,7 +72,7 @@ def run_model(params: dict, threshold: int, data: tuple[str, str], random: int) 
     if params['optimization'] >= threshold:
         optimization = torch.optim.Adam
     else:
-        optimization = torch.optim.SGD
+        optimization = torch.optim.RMSprop
 
     '''
     Para selecionarmos a função de ativação usamos o parâmetro limiar e
@@ -75,12 +87,12 @@ def run_model(params: dict, threshold: int, data: tuple[str, str], random: int) 
 
     # Criar modelos com base nos parâmetros
     model = nn.Sequential(
-        nn.Linear(30, params['neurons']),
+        nn.Linear(input_length, params['neurons']),
         activation(),
         nn.Linear(params['neurons'], params['neurons']),
         activation(),
         nn.Linear(params['neurons'], 1),
-        nn.Sigmoid()
+        nn.ReLU()
     )
 
     # Instanciar optimizador
@@ -108,8 +120,7 @@ def run_model(params: dict, threshold: int, data: tuple[str, str], random: int) 
     # Avaliar modelo
     model.eval()
     predictions = model.forward(X_test_tensors)
-    predictions = np.array(predictions > 0.5)
-    accuracy = accuracy_score(y_test_tensors, predictions)
+    accuracy = mean_squared_error(y_test_tensors.detach().numpy(), predictions.detach().numpy())
     return accuracy
 
 def main():
@@ -121,15 +132,21 @@ def main():
         'activation': random.randint(start, end),
         'optimization': random.randint(start, end),
     }
-    acc = run_model(
+
+    print('Neural network hyperparameters:', params)
+
+    nlp = spacy.load('pt_core_news_sm')
+
+    mse = run_model(
+        nlp,
         params,
         end // 2,
-        ('data/breast_in.csv',
-        'data/breast_out.csv'),
+        ('data/essay_in.csv',
+        'data/essay_out.csv'),
         random=42
     )
 
-    print('Model accuracy: ', acc)
+    print('Model MSE: ', mse)
 
 
 if __name__ == '__main__':
