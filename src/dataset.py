@@ -6,10 +6,10 @@ from pandas import DataFrame
 def preprocess(path: str, sample_size: int = None, random_state: int = 42) -> tuple[DataFrame, DataFrame]:
     # Read dataset and select columns
     df = pd.read_excel(path, engine='openpyxl')
-    if sample_size:
-        df = df.sample(n=sample_size, random_state=random_state)
     df = df[['essay_set', 'essay', 'domain1_score']]
     df = df.loc[df['essay_set'] == 1]
+    if sample_size:
+        df = df.sample(n=sample_size, random_state=random_state)
     df.rename(columns={'domain1_score': 'score'}, inplace=True)
     print('Dataset length:', len(df))
     
