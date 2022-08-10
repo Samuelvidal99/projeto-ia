@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pickle as pkl
 import random
 import numpy as np
 import spacy
@@ -28,10 +29,16 @@ def run_model(nlp: Portuguese, params: dict, threshold: int, data: tuple[str, st
     labels = pd.read_csv(data[1])
 
     # Coletar vetores das sentenças e configurar o tamanho máximo de entrada
-    features_ = []
-    for _, row in tqdm(features.iterrows()):
-        text = row['essay']
-        features_.append(nlp(text).vector)
+
+    try:
+        features_ = pkl.load(open('artifacts/features.pkl', 'rb'))
+    except:
+        features_ = []
+        for _, row in tqdm(features.iterrows()):
+            text = row['essay']
+            features_.append(nlp(text).vector)
+        
+        pkl.dump(features_, open('artifacts/features.pkl', 'wb'))
 
     input_length = len(features_[0])
     
