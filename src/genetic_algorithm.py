@@ -1,4 +1,5 @@
 from concurrent.futures import ProcessPoolExecutor
+from typing import Callable
 import numpy as np
 import spacy
 from model import run_model
@@ -6,6 +7,7 @@ from model import run_model
 
 MIN_BOUND = 1
 MAX_BOUND = 20
+NUM_FEATURES = 5
 
 
 def initialize(population_size: int, n_features: int, seed: int = 0) -> np.ndarray:
@@ -59,29 +61,72 @@ def selection(population: np.ndarray, n_parents: int | None = None) -> np.ndarra
         n_parents = n_chromo// 2
     return population[:n_parents]
 
+CrossoverStrategy = Callable[[np.ndarray, np.ndarray], tuple[np.ndarray,np.ndarray]]
 
-def crossover(population: np.ndarray, div_index: int | None = None) -> np.ndarray:
+def uniform_strategy(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """get genes from both parents in a uniform way
+    ex: from parents AAAAA and BBBBB
+        ABAAB
+        BABBA
     """
-    population: after selection
+    cond = np.random.randint(0, 2, a.shape[-1], dtype=bool)
+    return np.where(cond, a, b), np.where(~cond, a, b)
+
+
+def singlepoint_strategy(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """split each chromosome in 2 parts and combine to make 2 children
+    ex: from parents AAAAA and BBBBB
+        AABBB
+        BBAAA
     """
-    n_features = population.shape[1]
-    if div_index is None:
-        div_index =  n_features // 2
+    cond = np.zeros(a.shape, bool)
+    cond[:len(a)//2] = True
+    return np.where(cond, a, b), np.where(~cond, a, b)
 
-    pop_nextgen = list(population)
 
-    # itera de 2 em 2
-    for i in range(0, len(population), 2):
-        # obtém os pais da criança
-        chromo1, chromo2 = pop_nextgen[i], pop_nextgen[i + 1]
+def multipoint_strategy(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """split each chromosome in 3 parts and combine to make 2 children
+    ex: from parents AAAAA and BBBBB
+        AABAA
+        BBABB
+    """
+    cond = np.zeros(a.shape, bool)
+    third = len(a)//3
+    cond[third:2*third] = True
+    return np.where(cond, a, b), np.where(~cond, a, b)
 
-        # passa metade de cada cromosomo para a próxima geração
-        new_par = np.concatenate((chromo1[: div_index], chromo2[div_index :]))
 
-        # adiciona a criança mantendo os pais
-        pop_nextgen.append(new_par)
+def random_singlepoint_strategy(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    cond = np.zeros(a.shape, bool)
+    cond[:np.random.randint(2, len(a))] = True
+    return np.where(cond, a, b), np.where(~cond, a, b)
 
-    return np.array(pop_nextgen)
+
+def crossover(
+    population: np.ndarray,
+    strategy: CrossoverStrategy = uniform_strategy
+) -> np.ndarray:
+    """Genetic Algorithm Crossover
+    
+    population: população ordenada pelo melhor fitness
+    """
+    next_population = list(population)
+
+    # itera de 2 em 2, se tiver população impar irá pular o último
+    for i in range(0, len(population) -1, 2):
+        # selecionando indices que serão pertencentes a cada parente
+        children = strategy(population[i], population[i + 1])
+
+        # adiciona a crianças à população mantendo também os pais
+        next_population.extend(children)
+
+    # se for ímpar, o último cromosomo não teve reprodução
+    if len(population) % 2 != 0:
+        # misturando genes do melhor e pior cromosomo
+        children = strategy(population[0], population[-1])
+        next_population.extend(children)
+
+    return np.array(next_population)
 
 def mutation(population: np.ndarray, mutation_rate) -> np.ndarray:
     """
@@ -109,7 +154,7 @@ def mutation(population: np.ndarray, mutation_rate) -> np.ndarray:
 def main(
     n_generations: int = 10,
     population_size: int = 20,
-    n_features: int = 5 # -> epochs, batch_size, neurons, activation, optimization
+    n_features: int = NUM_FEATURES # -> epochs, batch_size, neurons, activation, optimization
 ):
     # no inicio nada existia, então eu criei o mundo...
     population = initialize(population_size, n_features)
@@ -146,4 +191,3 @@ def main(
 
 if __name__ == "__main__":
     main()
-
