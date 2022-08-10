@@ -115,7 +115,7 @@ def run_model(nlp: Portuguese, params: dict, threshold: int, data: tuple[str, st
 
             loss = running_loss / len(train_loader)
         
-        print(f'Epoch {epoch + 1}: loss {loss:.5f}')
+        # print(f'Epoch {epoch + 1}: loss {loss:.5f}')
 
     # Avaliar modelo
     model.eval()
