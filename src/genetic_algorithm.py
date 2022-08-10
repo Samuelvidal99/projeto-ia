@@ -128,24 +128,25 @@ def crossover(
 
     return np.array(next_population)
 
-def mutation(population: np.ndarray, mutation_rate) -> np.ndarray:
+def mutation(population: np.ndarray, mutation_rate: float = 0.2) -> np.ndarray:
     """
     population: after crossover
     """
-    n_feat = population.shape[1]
-
-    mutation_range = int(mutation_rate * n_feat)
+    num_features = population.shape[1]
+    num_mutations = int(mutation_rate * num_features)
 
     next_population = []
-
     for chromo in population:
 
         # Calculando quais genes do cromosomo serão mutados
-        indexes = np.random.randint(0, n_feat -1, size=mutation_range)
+        indexes = np.random.randint(0, num_features -1, size=num_mutations)
         
         # Realizando Mutação no cromosomo
-        for i in indexes:
-            chromo[i] = np.clip(chromo[i] + np.random.randint(-2, 2), MIN_BOUND, MAX_BOUND)
+        chromo[indexes] = np.clip(
+            chromo[indexes] + np.random.randint(-2, 3, len(indexes)),
+            MIN_BOUND,
+            MAX_BOUND
+        )
         next_population.append(chromo)
 
     return np.array(next_population)
