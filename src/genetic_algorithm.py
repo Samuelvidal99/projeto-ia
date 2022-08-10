@@ -1,4 +1,6 @@
 from concurrent.futures import ProcessPoolExecutor
+from dataclasses import dataclass, field
+import time
 from typing import Callable
 import numpy as np
 import spacy
@@ -13,7 +15,7 @@ NUM_FEATURES = 5
 def initialize(population_size: int, n_features: int, seed: int = 0) -> np.ndarray:
     np.random.seed(seed)
     shape = (population_size, n_features)
-    result = np.random.randint(1, 20, shape)
+    result = np.random.randint(MIN_BOUND, MAX_BOUND, shape)
     np.random.shuffle(result)
     return result
 
@@ -37,7 +39,7 @@ def fitness_score(population: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
 
     population_list = map(lambda arr: list(map(int, arr)), population)
-    with ProcessPoolExecutor(4) as executor:
+    with ProcessPoolExecutor(8) as executor:
         scores = list(executor.map(score, population_list))
     scores = np.array(scores)
 
@@ -151,24 +153,50 @@ def mutation(population: np.ndarray, mutation_rate: float = 0.2) -> np.ndarray:
 
     return np.array(next_population)
 
+@dataclass
+class LifeBook:
+    generation: list[int] = field(default_factory=list)
+    best_score: list[float] = field(default_factory=list)
+    best_chromo: list[np.ndarray] = field(default_factory=list)
+    populations: list[np.ndarray] = field(default_factory=list)
+    time_passed: list[float] = field(default_factory=list)
+
+    def write(self,
+        generation: int,
+        best_score: float,
+        best_chromo: np.ndarray,
+        population: np.ndarray,
+        time_passed: float
+    ) -> None:
+        self.generation.append(generation)
+        self.best_score.append(best_score)
+        self.best_chromo.append(best_chromo)
+        self.populations.append(population)
+        self.time_passed.append(time_passed)
+
 
 def main(
     n_generations: int = 10,
     population_size: int = 20,
     n_features: int = NUM_FEATURES # -> epochs, batch_size, neurons, activation, optimization
 ):
-    # no inicio nada existia, então eu criei o mundo...
+    # no inicio nada existia, então criei o tempo...
+    begin = time.time()
+
+    # então eu criei o mundo...
     population = initialize(population_size, n_features)
 
+    # iniciei a escritura do livro da vida...
+    lifebook = LifeBook()
+
+    # julguei os primeiros da existencia para escolher um rei...
     score, population = fitness_score(population)
     best_score = score[0]
     best_chromo = population[0]
 
     # planejei o fim do mundo e quantas gerações devem existir...
     for i in range(n_generations):
-
-        # elevei meu fiel preferido diante dos outros...
-        print('Melhor Pontuação:', score[0], 'feito por:', population[0])
+        begin_generation = time.time()
 
         # matei os que não mereciam viver e preservei os mais fieis...
         population = selection(population)
@@ -179,16 +207,31 @@ def main(
         # mudei a aparencia dos mais feios, segundo a minha vontade...
         population = mutation(population)
 
-        # então eu julguei todos perante a minha vontade...
+        # então eu julguei a todos...
         score, population = fitness_score(population)
-        if score[0] > best_score:
+        if score[0] < best_score:
             best_score = score[0]
             best_chromo = population[0]
-    
-    print('Melhor Pontuação:', best_score, 'feito por:', best_chromo)
-    return best_score, best_chromo
+        
+        # ao fim de cada geração anotei tudo no livro da vida...
+        lifebook.write(
+            generation=i,
+            best_score=best_score,
+            best_chromo=best_chromo,
+            population=population,
+            time_passed=time.time() - begin_generation
+        )
+
+        # elevei meu fiel preferido diante dos outros...
+        print('Melhor Pontuação:', best_score, 'feito por:', best_chromo)
+
+    # assim o mundo acabou...
+    end = time.time()
+    lifebook.total_time_passed = end - begin
+    return lifebook
 
 
 
 if __name__ == "__main__":
-    main()
+    results = main(100, 10)
+    print(results)
