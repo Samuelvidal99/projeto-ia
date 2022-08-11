@@ -1,4 +1,6 @@
-from concurrent.futures import ProcessPoolExecutor
+# from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import process
+from tqdm.contrib.concurrent import process_map
 from dataclasses import dataclass, field
 import time
 from typing import Callable
@@ -10,6 +12,8 @@ from model import run_model
 MIN_BOUND = 1
 MAX_BOUND = 20
 NUM_FEATURES = 5
+NUM_GENERATIONS = 100
+NUM_POPULATION = 20
 
 
 def initialize(population_size: int, n_features: int, seed: int = 0) -> np.ndarray:
@@ -24,10 +28,7 @@ def score(chromosome: np.ndarray) -> float:
     param_keys = ["epochs", "batch_size", "neurons", "activation", "optimization"]
     params = dict(zip(param_keys, chromosome))
     nlp = spacy.load("pt_core_news_sm")
-    mse = run_model(
-        nlp,
-        params,
-        threshold=10,
+    mse = run_model(nlp, params, threshold=10,
         data=("data/essay_in.csv", "data/essay_out.csv"),
         random=42,
     )
@@ -38,9 +39,8 @@ def fitness_score(population: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     population: after initialization
     """
 
-    population_list = map(lambda arr: list(map(int, arr)), population)
-    with ProcessPoolExecutor(8) as executor:
-        scores = list(executor.map(score, population_list))
+    population_list = list(map(lambda arr: list(map(int, arr)), population))
+    scores = process_map(score, population_list, max_workers=8, total=len(population_list))
     scores = np.array(scores)
 
     # obtendo indices que ordenam pelo maior score
@@ -160,6 +160,7 @@ class LifeBook:
     best_chromo: list[np.ndarray] = field(default_factory=list)
     populations: list[np.ndarray] = field(default_factory=list)
     time_passed: list[float] = field(default_factory=list)
+    total_time_passed: float = field(default=0.0)
 
     def write(self,
         generation: int,
@@ -223,7 +224,7 @@ def main(
         )
 
         # elevei meu fiel preferido diante dos outros...
-        print('Melhor Pontuação:', best_score, 'feito por:', best_chromo)
+        print('Geração', i,': Melhor Pontuação:', best_score, 'em:', lifebook.time_passed[-1], 'feito por:', best_chromo)
 
     # assim o mundo acabou...
     end = time.time()
@@ -233,5 +234,26 @@ def main(
 
 
 if __name__ == "__main__":
-    results = main(100, 10)
-    print(results)
+    import pickle
+    NUM_GENERATIONS = 50
+
+    exp5 = main(NUM_GENERATIONS, 5)
+    pickle.dump(exp5, open('artifacts/exp5.pkl', 'wb'))
+    
+    exp10 = main(NUM_GENERATIONS, 10)
+    pickle.dump(exp10, open('artifacts/exp10.pkl', 'wb'))
+    
+    exp15 = main(NUM_GENERATIONS, 15)
+    pickle.dump(exp15, open('artifacts/exp15.pkl', 'wb'))
+
+    exp20 = main(NUM_GENERATIONS, 20)
+    pickle.dump(exp20, open('artifacts/exp20.pkl', 'wb'))
+
+    exp25 = main(NUM_GENERATIONS, 25)
+    pickle.dump(exp25, open('artifacts/exp25.pkl', 'wb'))
+
+    exp30 = main(NUM_GENERATIONS, 30)
+    pickle.dump(exp30, open('artifacts/exp30.pkl', 'wb'))
+
+    print('wait')
+
