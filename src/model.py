@@ -41,6 +41,8 @@ def run_model(nlp: Portuguese, params: dict, threshold: int, data: tuple[str, st
         pkl.dump(features_, open('artifacts/features.pkl', 'wb'))
 
     input_length = len(features_[0])
+
+    print(input_length)
     
     # Converter objetos para arrays
     features = np.array(features_, dtype='float32')
