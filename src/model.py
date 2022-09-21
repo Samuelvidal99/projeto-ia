@@ -1,76 +1,55 @@
 from __future__ import annotations
 
-import pandas as pd
+import json
 import pickle as pkl
 import random
 import numpy as np
-import spacy
-import torch
-import torch.nn as nn
-from tqdm import tqdm
-from spacy.lang.pt import Portuguese
-from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import train_test_split
+import tensorflow as tf
+import keras
+from keras import layers
+from keras.preprocessing.text import Tokenizer
+from keras.preprocessing.sequence import pad_sequences
 
 
-def run_model(nlp: Portuguese, params: dict, threshold: int, data: tuple[str, str], random: int) -> float:
+def run_model(params: dict, threshold: int, random: int) -> float:
     # Configurar seeds
     np.random.seed(random)
-    torch.manual_seed(random)
+    tf.random.set_seed(random)
 
     # Configurar hiperparâmetros estáticos
-    lr = 0.001
-    weight_decay = 0.0001
-    criterion = nn.MSELoss()
-    test_size = 0.25
+    valid_size = 0.25
+    embedding_dim = 300
 
     # Carregar dados
-    features = pd.read_csv(data[0])
-    labels = pd.read_csv(data[1])
+    def read_json(path):
+        with open(path) as f:
+            data = json.loads(f.read())
+        return data
 
-    # Coletar vetores das sentenças e configurar o tamanho máximo de entrada
+    train_set = read_json('data/train_set.json')
+    test_set = read_json('data/test_set.json')
 
-    try:
-        features_ = pkl.load(open('artifacts/features.pkl', 'rb'))
-    except:
-        features_ = []
-        for _, row in tqdm(features.iterrows()):
-            text = row['essay']
-            features_.append(nlp(text).vector)
-        
-        pkl.dump(features_, open('artifacts/features.pkl', 'wb'))
+    X_train = [i['text'] for i in train_set]
+    X_test = [i['text'] for i in test_set]
 
-    input_length = len(features_[0])
+    y_train = np.array([float(i['label']) for i in train_set], dtype='float32')
+    y_test = np.array([float(i['label']) for i in test_set], dtype='float32')
 
-    print(input_length)
-    
-    # Converter objetos para arrays
-    features = np.array(features_, dtype='float32')
-    labels = np.array(labels, dtype='float32')
+    # Ajustar tokenizador
+    tokenizer = Tokenizer(num_words=5000)
+    tokenizer.fit_on_texts(X_train)
 
-    # Separar os dados em conjunto de treino e teste
-    X_train, X_test, y_train, y_test = train_test_split(
-        features,
-        labels,
-        test_size=test_size
-    )
+    # Configurar alguns parâmetros
+    vocab_size = len(tokenizer.word_index) + 1
+    maxlen = 30
 
-    # Transformar arrays em tensores e instanciar o train loader
-    X_train_tensors = torch.tensor(np.array(X_train), dtype=torch.float)
-    y_train_tensors = torch.tensor(np.array(y_train), dtype=torch.float)
-    X_test_tensors = torch.tensor(np.array(X_test), dtype=torch.float)
-    y_test_tensors = torch.tensor(np.array(y_test), dtype=torch.float)
+    # Converter os textos para sequências
+    X_train_seq = tokenizer.texts_to_sequences(X_train)
+    X_test_seq = tokenizer.texts_to_sequences(X_test)
 
-    dataset = torch.utils.data.TensorDataset(
-        X_train_tensors,
-        y_train_tensors,
-    )
-
-    train_loader = torch.utils.data.DataLoader(
-        dataset,
-        batch_size=params['batch_size'],
-        shuffle=True
-    )
+    # Pad sequences
+    X_train_pad = pad_sequences(X_train_seq, padding='post', maxlen=maxlen)
+    X_test_pad = pad_sequences(X_test_seq, padding='post', maxlen=maxlen)
 
     '''
     Para selecionarmos o método de otimização usamos o parâmetro limiar e
@@ -79,9 +58,9 @@ def run_model(nlp: Portuguese, params: dict, threshold: int, data: tuple[str, st
     '''
     optimization = None
     if params['optimization'] >= threshold:
-        optimization = torch.optim.Adam
+        optimization = 'adam'
     else:
-        optimization = torch.optim.RMSprop
+        optimization = 'rmsprop'
 
     '''
     Para selecionarmos a função de ativação usamos o parâmetro limiar e
@@ -90,47 +69,36 @@ def run_model(nlp: Portuguese, params: dict, threshold: int, data: tuple[str, st
     '''
     activation = None
     if params['activation'] >= threshold:
-        activation = nn.ReLU
+        activation = 'relu'
     else:
-        activation = nn.Tanh
+        activation = 'tanh'
+
+    embedding_matrix = pkl.load(open('artifacts/embedding_matrix.pkl', 'rb'))
 
     # Criar modelos com base nos parâmetros
-    model = nn.Sequential(
-        nn.Linear(input_length, params['neurons']),
-        activation(),
-        nn.Linear(params['neurons'], params['neurons']),
-        activation(),
-        nn.Linear(params['neurons'], 1),
-        nn.ReLU()
-    )
+    inputs = keras.Input(shape=(maxlen,), dtype='int32')
+    embedded = layers.Embedding(
+        input_dim=vocab_size,
+        output_dim=embedding_dim,
+        weights=[embedding_matrix],
+        trainable=False,
+        mask_zero=True
+    )(inputs)
+    x = layers.Bidirectional(layers.LSTM(params['neurons']))(embedded)
+    x = layers.Dropout(0.2)(x)
+    x = layers.Dense(params['neurons']*2, activation=activation)(x)
+    x = layers.Dropout(0.2)(x)
+    x = layers.Dense(params['neurons']*2, activation=activation)(x)
+    x = layers.Dropout(0.2)(x)
+    outputs = layers.Dense(1, activation=activation)(x)
+    model = keras.Model(inputs, outputs)
+    model.compile(optimizer=optimization, loss='mse', metrics='mae')
 
-    # Instanciar optimizador
-    optimizer = optimization(model.parameters(), lr=lr, weight_decay=weight_decay)
-
-    # Treinar modelo
-    for epoch in range(params['epochs']):
-        running_loss = 0.
-
-        for data in train_loader:
-            inputs, labels = data
-            optimizer.zero_grad()
-
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-
-            running_loss += loss.item()
-
-            loss = running_loss / len(train_loader)
-        
-        # print(f'Epoch {epoch + 1}: loss {loss:.5f}')
-
+    model.fit(X_train_pad, y_train, epochs=params['epochs'], validation_split=valid_size, batch_size=params['batch_size'])
+    
     # Avaliar modelo
-    model.eval()
-    predictions = model.forward(X_test_tensors)
-    accuracy = mean_squared_error(y_test_tensors.detach().numpy(), predictions.detach().numpy())
-    return accuracy
+    mae = model.evaluate(X_test_pad, y_test, verbose=1)[0]
+    return mae
 
 def main():
     start, end = 1, 20
@@ -144,18 +112,13 @@ def main():
 
     print('Neural network hyperparameters:', params)
 
-    nlp = spacy.load('pt_core_news_sm')
-
-    mse = run_model(
-        nlp,
+    mae = run_model(
         params,
         end // 2,
-        ('data/essay_in.csv',
-        'data/essay_out.csv'),
         random=42
     )
 
-    print('Model MSE: ', mse)
+    print('Model MSE: ', mae)
 
 
 if __name__ == '__main__':

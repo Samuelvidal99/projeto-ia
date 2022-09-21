@@ -3,3 +3,11 @@ torch==1.12.0
 skorch==0.11.0
 spacy==3.4.1
 openpyxl==3.0.10
+ipykernel==6.15.3
+jupyterlab==3.4.7
+pandas==1.5.0
+ipywidgets==7.0.2
+pytorch-lightning==1.7.6
+lightning-transformers==0.2.1
+tensorflow==2.8.2
+keras==2.8.0
