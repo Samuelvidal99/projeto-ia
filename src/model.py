@@ -118,7 +118,7 @@ def main():
         random=42
     )
 
-    print('Model MSE: ', mae)
+    print('Model MAE: ', mae)
 
 
 if __name__ == '__main__':
