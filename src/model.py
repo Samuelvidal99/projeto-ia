@@ -97,7 +97,7 @@ def run_model(params: dict, threshold: int, random: int) -> float:
     model.fit(X_train_pad, y_train, epochs=params['epochs'], validation_split=valid_size, batch_size=params['batch_size'])
     
     # Avaliar modelo
-    mae = model.evaluate(X_test_pad, y_test, verbose=1)[0]
+    mae = model.evaluate(X_test_pad, y_test, verbose=1)[1]
     return mae
 
 def main():
