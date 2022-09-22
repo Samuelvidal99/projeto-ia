@@ -238,20 +238,21 @@ if __name__ == "__main__":
     # exp5 = main(NUM_GENERATIONS, 5)
     # pickle.dump(exp5, open('artifacts/exp5.pkl', 'wb'))
     
-    exp10 = main(NUM_GENERATIONS, 10)
-    pickle.dump(exp10, open('artifacts/exp10.pkl', 'wb'))
+    # exp10 = main(NUM_GENERATIONS, 10)
+    # pickle.dump(exp10, open('artifacts/exp10.pkl', 'wb'))
     
     # exp15 = main(NUM_GENERATIONS, 15)
     # pickle.dump(exp15, open('artifacts/exp15.pkl', 'wb'))
 
-    exp20 = main(NUM_GENERATIONS, 20)
-    pickle.dump(exp20, open('artifacts/exp20.pkl', 'wb'))
+    # exp20 = main(NUM_GENERATIONS, 20)
+    # pickle.dump(exp20, open('artifacts/exp20.pkl', 'wb'))
+    obj: LifeBook = pickle.load(open('artifacts/exp20.pkl', 'rb'))
 
     # exp25 = main(NUM_GENERATIONS, 25)
     # pickle.dump(exp25, open('artifacts/exp25.pkl', 'wb'))
 
-    exp30 = main(NUM_GENERATIONS, 30)
-    pickle.dump(exp30, open('artifacts/exp30.pkl', 'wb'))
+    # exp30 = main(NUM_GENERATIONS, 30)
+    # pickle.dump(exp30, open('artifacts/exp30.pkl', 'wb'))
 
     print('wait')
 
