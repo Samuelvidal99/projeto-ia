@@ -1,4 +1,6 @@
+from __future__ import annotations
 # from concurrent.futures import ProcessPoolExecutor
+
 from concurrent.futures import process
 from tqdm.contrib.concurrent import process_map
 from dataclasses import dataclass, field
@@ -25,13 +27,9 @@ def initialize(population_size: int, n_features: int, seed: int = 0) -> np.ndarr
 
 
 def score(chromosome: np.ndarray) -> float:
-    param_keys = ["epochs", "batch_size", "neurons", "activation", "optimization"]
+    param_keys = ("epochs", "batch_size", "neurons", "activation", "optimization")
     params = dict(zip(param_keys, chromosome))
-    nlp = spacy.load("pt_core_news_sm")
-    mse = run_model(nlp, params, threshold=10,
-        data=("data/essay_in.csv", "data/essay_out.csv"),
-        random=42,
-    )
+    mse = run_model(params=params, threshold=10, random=42)
     return mse
 
 def fitness_score(population: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -63,7 +61,7 @@ def selection(population: np.ndarray, n_parents: int | None = None) -> np.ndarra
         n_parents = n_chromo// 2
     return population[:n_parents]
 
-CrossoverStrategy = Callable[[np.ndarray, np.ndarray], tuple[np.ndarray,np.ndarray]]
+CrossoverStrategy = Callable[[np.ndarray, np.ndarray], 'tuple[np.ndarray,np.ndarray]']
 
 def uniform_strategy(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """get genes from both parents in a uniform way
@@ -237,20 +235,20 @@ if __name__ == "__main__":
     import pickle
     NUM_GENERATIONS = 50
 
-    exp5 = main(NUM_GENERATIONS, 5)
-    pickle.dump(exp5, open('artifacts/exp5.pkl', 'wb'))
+    # exp5 = main(NUM_GENERATIONS, 5)
+    # pickle.dump(exp5, open('artifacts/exp5.pkl', 'wb'))
     
     exp10 = main(NUM_GENERATIONS, 10)
     pickle.dump(exp10, open('artifacts/exp10.pkl', 'wb'))
     
-    exp15 = main(NUM_GENERATIONS, 15)
-    pickle.dump(exp15, open('artifacts/exp15.pkl', 'wb'))
+    # exp15 = main(NUM_GENERATIONS, 15)
+    # pickle.dump(exp15, open('artifacts/exp15.pkl', 'wb'))
 
     exp20 = main(NUM_GENERATIONS, 20)
     pickle.dump(exp20, open('artifacts/exp20.pkl', 'wb'))
 
-    exp25 = main(NUM_GENERATIONS, 25)
-    pickle.dump(exp25, open('artifacts/exp25.pkl', 'wb'))
+    # exp25 = main(NUM_GENERATIONS, 25)
+    # pickle.dump(exp25, open('artifacts/exp25.pkl', 'wb'))
 
     exp30 = main(NUM_GENERATIONS, 30)
     pickle.dump(exp30, open('artifacts/exp30.pkl', 'wb'))
